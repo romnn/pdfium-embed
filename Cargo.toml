@@ -1,0 +1,71 @@
+[workspace]
+resolver = "3"
+members = ["crates/*"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/romnn/pdfium-embed"
+
+[workspace.dependencies]
+# Only the RGBA buffer type is used; pdfium renders the pixels itself.
+image = { version = "0.25", default-features = false }
+parking_lot = "0.13"
+tempfile = "3.10"
+thiserror = "2"
+
+# Build dependencies
+eyre = "0.6"
+flate2 = "1"
+sha2 = "0.10"
+tar = "0.4"
+ureq = "3"
+
+# Dev dependencies
+color-eyre = "0.6"
+googletest = "0.14"
+
+[workspace.lints.rust]
+warnings = { level = "warn", priority = -1 }
+unsafe_code = "deny"
+unused_must_use = "deny"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"
+unreachable = "deny"
+unimplemented = "deny"
+todo = "deny"
+dbg_macro = "deny"
+indexing_slicing = "deny"
+missing_errors_doc = "warn"
+await_holding_lock = "deny"
+self_named_module_files = "deny" # a module with submodules lives in foo/mod.rs, never foo.rs + foo/
+allow_attributes_without_reason = "deny" # every #[allow] must carry reason = "..."
+
+# Allowed
+map_unwrap_or = "allow"
+assigning_clones = "allow"
+struct_excessive_bools = "allow"
+
+[workspace.metadata.cargo-fc]
+install_missing_targets = true
+dedupe = true
+aggregate_targets = false
+targets = [
+  "x86_64-unknown-linux-gnu",
+  "x86_64-pc-windows-gnu",
+  "aarch64-apple-darwin",
+]
+
+[workspace.metadata.cargo-fc.subcommands.lint]
+# A warning on any target fails the lint run, while builds and tests keep warnings as warnings.
+pedantic = true
+
+[workspace.metadata.cargo-fc.subcommands.udeps]
+maximal_features = true

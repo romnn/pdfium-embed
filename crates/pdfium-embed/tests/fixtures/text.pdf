@@ -1,0 +1,57 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R 6 0 R] /Count 2 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 1087 >>
+stream
+BT /F1 11 Tf 56 780 Td (the quick brown fox jumps over the lazy) Tj ET
+BT /F1 11 Tf 56 762 Td (fox jumps over the lazy dog and keeps) Tj ET
+BT /F1 11 Tf 56 744 Td (the lazy dog and keeps running through fields) Tj ET
+BT /F1 11 Tf 56 726 Td (and keeps running through fields of tall grass) Tj ET
+BT /F1 11 Tf 56 708 Td (through fields of tall grass until the evening) Tj ET
+BT /F1 11 Tf 56 690 Td (tall grass until the evening light fades away) Tj ET
+BT /F1 11 Tf 56 672 Td (the evening light fades away the quick brown) Tj ET
+BT /F1 11 Tf 56 654 Td (fades away the quick brown fox jumps over) Tj ET
+BT /F1 11 Tf 56 636 Td (quick brown fox jumps over the lazy dog) Tj ET
+BT /F1 11 Tf 56 618 Td (jumps over the lazy dog and keeps running) Tj ET
+BT /F1 11 Tf 56 600 Td (lazy dog and keeps running through fields of) Tj ET
+BT /F1 11 Tf 56 582 Td (keeps running through fields of tall grass until) Tj ET
+BT /F1 12 Tf 0 Ts 56 546 Td (Total) Tj /F1 7 Tf 5 Ts (3) Tj ET
+BT /F1 12 Tf 0 Ts 176 546 Td (Fee) Tj /F1 7 Tf 5 Ts (4) Tj ET
+BT /F1 12 Tf 0 Ts 296 546 Td (Rate) Tj /F1 7 Tf 5 Ts (7) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents 7 0 R >>
+endobj
+7 0 obj
+<< /Length 43 >>
+stream
+BT /F1 12 Tf 56 760 Td (Second page) Tj ET
+endstream
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000121 00000 n 
+0000000191 00000 n 
+0000000317 00000 n 
+0000001455 00000 n 
+0000001581 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R >>
+startxref
+1673
+%%EOF

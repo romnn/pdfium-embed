@@ -1,0 +1,53 @@
+[package]
+name = "pdfium-embed"
+description = "Safe, serialized access to pdfium, with the pdfium library embedded in the binary at build time"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+readme = "README.md"
+keywords = ["pdf", "pdfium", "render", "text-extraction"]
+categories = ["multimedia::images", "text-processing", "api-bindings"]
+include = ["/src", "/build.rs", "/tests", "/README.md", "/LICENSE-MIT", "/LICENSE-APACHE"]
+
+[lints]
+workspace = true
+
+[features]
+default = ["bundled"]
+# Downloads the prebuilt pdfium for the target at build time and embeds it in the binary.
+bundled = ["dep:tempfile", "dep:eyre", "dep:flate2", "dep:sha2", "dep:tar", "dep:ureq"]
+
+[dependencies]
+image.workspace = true
+parking_lot.workspace = true
+tempfile = { workspace = true, optional = true }
+thiserror.workspace = true
+# Pinned exactly: `pdfium_latest` names one pdfium release (chromium/7881 for 0.9.3), and the
+# library build.rs embeds must match that ABI.
+# dlsym lookups for newer entry points (such as `FPDF_StructElement_GetExpansion`) fail at bind
+# time if the library is older, and renamed or removed symbols fail if it is newer.
+# When bumping this dependency, also move `TAG` and the digests in build.rs to the chromium
+# release that the new `pdfium_latest` names (see pdfium-render's `[features]` table).
+# 0.9.2's custom font provider callback broke aarch64 Linux (`c_char` cast, upstream #260); 0.9.3
+# fixes it, along with two heap corruptions (a use-after-free on document close and a double
+# free on object drop).
+pdfium-render = { version = "=0.9.3", features = ["pdfium_latest", "image_latest", "thread_safe"] }
+
+[build-dependencies]
+eyre = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
+sha2 = { workspace = true, optional = true }
+tar = { workspace = true, optional = true }
+ureq = { workspace = true, optional = true }
+
+[dev-dependencies]
+color-eyre.workspace = true
+googletest.workspace = true
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]
+
+[package.metadata.cargo-fc]
+# `default` enables exactly `bundled`, so the `default` row already covers it.
+exclude_features = ["bundled"]

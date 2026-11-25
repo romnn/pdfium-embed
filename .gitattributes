@@ -1,0 +1,3 @@
+# The fixtures are text-only PDFs whose cross-reference tables hold byte offsets, so line
+# endings must never be converted.
+*.pdf binary
