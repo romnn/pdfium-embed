@@ -27,8 +27,9 @@ At run time, the first call writes the library to a temporary directory and load
   feature binds (`chromium/7881`), so the embedded library's ABI always matches the bindings.
 
 The API is small: page count, page size, rendering to an RGBA image with a mandatory bound on
-the longest pixel edge, plain text, positioned text segments and words, the visible page frame
-with its rotation, and copying a page range into a new PDF.
+the longest pixel edge, plain text, whole or within a character limit checked before the text is
+copied out of pdfium, positioned text segments and words, the visible page frame with its
+rotation, whether a document is encrypted, and copying a page range into a new PDF.
 
 ## Usage
 
@@ -64,6 +65,33 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 from then on.
 Every method takes the process-wide lock, so the instance can be shared across threads and
 async tasks.
+
+## Encrypted documents
+
+Opening a PDF that needs a password fails with `DocumentError::Encrypted`, and
+`Pdfium::with_document_password` opens it with its user or owner password.
+A PDF with an empty user password opens without one, so `Document::is_encrypted` tells whether
+an open document is encrypted all the same.
+
+```rust
+use pdfium_embed::{DocumentError, Pdfium};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // An empty page from this repository's tests, encrypted with the user password "user".
+    let pdf_bytes = std::fs::read("tests/fixtures/encrypted-user-password.pdf")?;
+    let pdfium = Pdfium::instance()?;
+
+    assert!(matches!(
+        pdfium.num_pages(&pdf_bytes),
+        Err(DocumentError::Encrypted(_))
+    ));
+    let encrypted = pdfium.with_document_password(&pdf_bytes, "user", |document| {
+        Ok::<_, DocumentError>(document.is_encrypted())
+    })?;
+    assert!(encrypted);
+    Ok(())
+}
+```
 
 ## Features
 

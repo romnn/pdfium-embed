@@ -7,6 +7,8 @@ mod binding;
 mod display_frame;
 #[cfg(feature = "bundled")]
 mod documents;
+#[cfg(feature = "bundled")]
+mod encryption;
 mod rect;
 #[cfg(feature = "bundled")]
 mod thread_safety;

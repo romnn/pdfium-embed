@@ -380,6 +380,8 @@ impl Pdfium {
 
     /// Extracts the text on the visible part of a page as a single string.
     ///
+    /// It allocates as much text as the page holds; [`Document::page_text_limited`] bounds it.
+    ///
     /// # Errors
     ///
     /// Returns an error if the PDF cannot be loaded or text extraction fails.
@@ -437,9 +439,7 @@ impl Pdfium {
     ) -> Result<Vec<u8>, crate::DocumentError> {
         let _guard = self.mutex.lock();
         let pdfium = pr::Pdfium::default();
-        let source_document = pdfium
-            .load_pdf_from_byte_slice(pdf_bytes, None)
-            .map_err(crate::DocumentError::LoadDocument)?;
+        let source_document = load_document(&pdfium, pdf_bytes, None)?;
 
         if page_count == 0 {
             return Err(crate::DocumentError::EmptyPageRange);
@@ -492,24 +492,74 @@ impl Pdfium {
     ///
     /// # Errors
     ///
-    /// Returns an error if the PDF cannot be loaded, or if the closure returns
-    /// an error.
+    /// Returns [`DocumentError::Encrypted`](crate::DocumentError::Encrypted) if the PDF needs a
+    /// password, another error if it cannot be loaded, and the closure's error if it fails.
     pub fn with_document<F, R, E>(&self, pdf_bytes: &[u8], f: F) -> Result<R, E>
+    where
+        F: FnOnce(&Document<'_>) -> Result<R, E>,
+        E: From<crate::DocumentError>,
+    {
+        self.open_document(pdf_bytes, None, f)
+    }
+
+    /// Opens an encrypted PDF with `password` and passes a [`Document`] handle to the closure.
+    ///
+    /// It works as [`with_document`](Self::with_document) does; either the user or the owner
+    /// password opens the document, and a PDF that is not encrypted ignores it.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DocumentError::Encrypted`](crate::DocumentError::Encrypted) if the password is
+    /// wrong, another error if the PDF cannot be loaded, and the closure's error if it fails.
+    pub fn with_document_password<F, R, E>(
+        &self,
+        pdf_bytes: &[u8],
+        password: &str,
+        f: F,
+    ) -> Result<R, E>
+    where
+        F: FnOnce(&Document<'_>) -> Result<R, E>,
+        E: From<crate::DocumentError>,
+    {
+        self.open_document(pdf_bytes, Some(password), f)
+    }
+
+    fn open_document<F, R, E>(&self, pdf_bytes: &[u8], password: Option<&str>, f: F) -> Result<R, E>
     where
         F: FnOnce(&Document<'_>) -> Result<R, E>,
         E: From<crate::DocumentError>,
     {
         let _guard = self.mutex.lock();
         let pdfium = pr::Pdfium::default();
-        let inner = pdfium
-            .load_pdf_from_byte_slice(pdf_bytes, None)
-            .map_err(|source| E::from(crate::DocumentError::LoadDocument(source)))?;
+        let inner = load_document(&pdfium, pdf_bytes, password)?;
         let doc = Document {
             inner,
             not_sync: PhantomData,
         };
         f(&doc)
     }
+}
+
+/// Loads a PDF, telling an encrypted document pdfium cannot open from any other failure.
+fn load_document<'a>(
+    pdfium: &'a pr::Pdfium,
+    pdf_bytes: &'a [u8],
+    password: Option<&str>,
+) -> Result<pr::PdfDocument<'a>, crate::DocumentError> {
+    use pr::PdfiumInternalError::{PasswordError, SecurityError};
+
+    pdfium
+        .load_pdf_from_byte_slice(pdf_bytes, password)
+        .map_err(|source| {
+            if matches!(
+                source,
+                pr::PdfiumError::PdfiumLibraryInternalError(PasswordError | SecurityError)
+            ) {
+                crate::DocumentError::Encrypted(source)
+            } else {
+                crate::DocumentError::LoadDocument(source)
+            }
+        })
 }
 
 /// A loaded PDF document, only accessible inside [`Pdfium::with_document`]
@@ -579,6 +629,21 @@ impl Document<'_> {
     #[must_use]
     pub fn num_pages(&self) -> u32 {
         self.inner.pages().len().try_into().unwrap_or(u32::MAX)
+    }
+
+    /// Returns whether the document is encrypted, including when it opened without a password.
+    ///
+    /// A PDF with an empty user password opens without one, yet its owner can still have
+    /// restricted what readers may do with it, such as copying its text.
+    #[must_use]
+    pub fn is_encrypted(&self) -> bool {
+        // pdfium reports no security handler only for a document without an encryption
+        // dictionary; pdfium-render maps revisions 2 to 4 and reports any other one, such as
+        // AES-256's 5 and 6, as an error, which still means the document is encrypted.
+        !matches!(
+            self.inner.permissions().security_handler_revision(),
+            Ok(pr::PdfSecurityHandlerRevision::Unprotected)
+        )
     }
 
     /// Returns the dimensions of one page in PDF points.
@@ -662,11 +727,38 @@ impl Document<'_> {
 
     /// Extracts the text on the visible part of one page.
     ///
+    /// It allocates as much text as the page holds; [`page_text_limited`](Self::page_text_limited)
+    /// bounds it.
+    ///
     /// # Errors
     ///
     /// Returns an error if the page index is out of range, its boundaries cannot be read, or
     /// text extraction fails.
     pub fn page_text(&self, page_index: u32) -> Result<String, crate::DocumentError> {
+        self.page_text_limited(page_index, usize::MAX)
+    }
+
+    /// Extracts the text on the visible part of one page, if the page holds at most `max_chars`
+    /// characters.
+    ///
+    /// The limit applies to every character pdfium finds on the page, the ones outside the
+    /// visible box included, and is checked before the text is copied out of pdfium.
+    /// The returned text then has at most `max_chars` characters as well.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DocumentError::PageTextTooLong`](crate::DocumentError::PageTextTooLong) if the
+    /// page holds more than `max_chars` characters, and another error if the page index is out
+    /// of range, its boundaries cannot be read, or text extraction fails.
+    pub fn page_text_limited(
+        &self,
+        page_index: u32,
+        max_chars: usize,
+    ) -> Result<String, crate::DocumentError> {
+        let too_long = crate::DocumentError::PageTextTooLong {
+            page_index,
+            max_chars,
+        };
         let page = self.get_page(page_index)?;
         // pdfium-render's `PdfPageText::all` asks for the text in a rectangle at the origin with
         // the displayed page size, which misses text on rotated or offset pages; the visible box
@@ -677,7 +769,21 @@ impl Document<'_> {
             .map_err(crate::DocumentError::ExtractPageText)?
             .bounds;
         let text = page.text().map_err(crate::DocumentError::ExtractPageText)?;
-        Ok(text.inside_rect(visible_box))
+
+        // `inside_rect` allocates whatever length pdfium reports for the box, and no API reports
+        // it without that allocation.
+        // pdfium's text for the box holds each character inside it as one or two UTF-16 units,
+        // plus at most a space or one line break for each character outside it, so checking the
+        // page's character count first bounds the allocation to two units per allowed character.
+        let page_chars = usize::try_from(text.len()).unwrap_or(usize::MAX);
+        if page_chars > max_chars {
+            return Err(too_long);
+        }
+        let visible_text = text.inside_rect(visible_box);
+        if visible_text.chars().count() > max_chars {
+            return Err(too_long);
+        }
+        Ok(visible_text)
     }
 
     /// Extracts the positioned text segments of one page.
