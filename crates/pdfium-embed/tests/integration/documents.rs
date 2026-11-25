@@ -2,7 +2,7 @@
 
 use color_eyre::eyre;
 use googletest::prelude::*;
-use pdfium_embed::{Pdfium, TextSegment};
+use pdfium_embed::{DocumentError, Pdfium, TextSegment};
 
 /// A one-page US Letter document, 612 × 864 points.
 fn single_page_pdf() -> eyre::Result<Vec<u8>> {
@@ -90,6 +90,31 @@ fn page_text_reads_the_text_layer() -> eyre::Result<()> {
     let pdf_bytes = text_pdf()?;
     let pdfium = Pdfium::instance()?;
     assert_that!(pdfium.page_text(&pdf_bytes, 1)?.as_str(), eq("Second page"));
+    Ok(())
+}
+
+/// The limit counts the page's characters, checked before the text is copied out of pdfium.
+#[test]
+fn page_text_limited_allows_up_to_the_limit() -> eyre::Result<()> {
+    let pdf_bytes = text_pdf()?;
+    let pdfium = Pdfium::instance()?;
+    let page_text_limited = |max_chars| {
+        pdfium.with_document(&pdf_bytes, |document| {
+            document.page_text_limited(1, max_chars)
+        })
+    };
+
+    // The second page holds exactly the eleven characters of "Second page".
+    let page_chars = "Second page".chars().count();
+    assert_that!(
+        page_text_limited(page_chars - 1),
+        err(matches_pattern!(DocumentError::PageTextTooLong {
+            page_index: eq(&1),
+            max_chars: eq(&(page_chars - 1)),
+        }))
+    );
+    assert_that!(page_text_limited(page_chars), ok(eq("Second page")));
+    assert_that!(page_text_limited(page_chars + 1), ok(eq("Second page")));
     Ok(())
 }
 

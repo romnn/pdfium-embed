@@ -43,10 +43,19 @@ pub enum InitError {
 
 /// An error loading, reading, rendering or writing a PDF document.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum DocumentError {
     /// The bytes are not a PDF pdfium can load.
     #[error("failed to load pdf document")]
     LoadDocument(#[source] PdfiumError),
+    /// The PDF is encrypted and pdfium cannot open it.
+    ///
+    /// The password is missing or wrong, or pdfium does not support the document's security
+    /// handler.
+    /// A PDF that opens without a password can still be encrypted, which
+    /// [`Document::is_encrypted`] tells.
+    #[error("pdf document is encrypted")]
+    Encrypted(#[source] PdfiumError),
     /// The page index exceeds the range pdfium addresses pages with.
     #[error("page index does not fit in i32")]
     PageIndexOutOfRange(#[source] std::num::TryFromIntError),
@@ -77,6 +86,14 @@ pub enum DocumentError {
     /// The page's text could not be read.
     #[error("failed to extract page text")]
     ExtractPageText(#[source] PdfiumError),
+    /// The page holds more text than the caller's limit.
+    #[error("text of page {page_index} exceeds {max_chars} characters")]
+    PageTextTooLong {
+        /// The zero-based index of the page.
+        page_index: u32,
+        /// The limit the caller gave, in characters.
+        max_chars: usize,
+    },
     /// A page range of zero pages was requested.
     #[error("pdf page range is empty")]
     EmptyPageRange,
